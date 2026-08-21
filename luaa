@@ -1,6 +1,7 @@
 --[[
     🔥 АВТО-ФЛИНГ + АВТО-РЕЖОЙН + ВОССТАНОВЛЕНИЕ ПОСЛЕ СМЕРТИ
     + АГРЕССИВНОЕ УДАЛЕНИЕ КАРТЫ + ПЛАТФОРМА
+    + РАБОТАЕТ НА ВСЕХ, КРОМЕ СПИСКА ИСКЛЮЧЕНИЙ
 ]]
 
 -- ========== СЛУЖБЫ ==========
@@ -9,6 +10,13 @@ local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local Player = Players.LocalPlayer
 local Lighting = game:GetService("Lighting")
+
+-- ========== СПИСОК ИСКЛЮЧЕНИЙ (НЕ ТРОГАТЬ) ==========
+local ExcludedPlayers = {
+    -- Добавляй сюда имена игроков, которых НЕ нужно флингать
+    -- "PlayerName1",
+    -- "PlayerName2",
+}
 
 -- ========== ТЕЛЕПОРТ ХУК (QUEUE_ON_TELEPORT) ==========
 local TeleportCheck = false
@@ -27,21 +35,38 @@ end)
 
 -- ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 local FlingActive = false
-local SelectedTargets = {}
 local RejoinTimer = nil
 local RejoinCount = 0
 local AutoRejoinActive = true
 local IsRespawning = false
-local PlayerListFrame = nil
 local PlatformCreated = false
+local PlayersToFling = {} -- Все игроки кроме исключений
 
 getgenv().OldPos = nil
 getgenv().FPDH = workspace.FallenPartsDestroyHeight
 
--- ========== АГРЕССИВНОЕ УДАЛЕНИЕ КАРТЫ ==========
+-- ========== ФУНКЦИЯ ОБНОВЛЕНИЯ СПИСКА ЦЕЛЕЙ ==========
+local function UpdateTargetsList()
+    PlayersToFling = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= Player then
+            local isExcluded = false
+            for _, excluded in ipairs(ExcludedPlayers) do
+                if player.Name == excluded then
+                    isExcluded = true
+                    break
+                end
+            end
+            if not isExcluded then
+                PlayersToFling[player.Name] = player
+            end
+        end
+    end
+    return #PlayersToFling
+end
 
+-- ========== АГРЕССИВНОЕ УДАЛЕНИЕ КАРТЫ ==========
 local function ClearEverything()
-    -- Проверяем, не создана ли уже платформа
     if PlatformCreated then return end
     
     pcall(function()
@@ -57,7 +82,6 @@ local function ClearEverything()
         -- === 2. УДАЛЕНИЕ ВСЕГО В WORKSPACE ===
         local objectsToDelete = {}
         for _, child in ipairs(workspace:GetChildren()) do
-            -- Пропускаем только самого игрока и его части
             if child ~= Player.Character then
                 local isPlayerPart = false
                 if Player.Character then
@@ -74,7 +98,6 @@ local function ClearEverything()
             end
         end
         
-        -- Удаляем всё найденное
         local deletedCount = 0
         for _, obj in ipairs(objectsToDelete) do
             pcall(function()
@@ -111,7 +134,6 @@ local function ClearEverything()
         platform.BrickColor = BrickColor.new("Bright blue")
         platform.Parent = workspace
         
-        -- Свечение
         local pointLight = Instance.new("PointLight")
         pointLight.Color = Color3.fromRGB(0, 100, 255)
         pointLight.Brightness = 5
@@ -165,14 +187,17 @@ local function ClearEverything()
         sky.SkyboxUp = "rbxassetid://4022045180"
         sky.Parent = Lighting
         
-        -- Яркость
         Lighting.Brightness = 0.5
         Lighting.Ambient = Color3.fromRGB(80, 80, 120)
         Lighting.OutdoorAmbient = Color3.fromRGB(80, 80, 120)
         
         PlatformCreated = true
         print("✅ КАРТА ПОЛНОСТЬЮ УДАЛЕНА! ОСТАЛАСЬ ТОЛЬКО ПЛАТФОРМА!")
-        Message("🗺️ КАРТА УДАЛЕНА", "Осталась только твоя платформа!", 4)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🗺️ КАРТА УДАЛЕНА",
+            Text = "Осталась только твоя платформа!",
+            Duration = 4
+        })
     end)
 end
 
@@ -182,7 +207,6 @@ ScreenGui.Name = "AutoFlingGUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game:GetService("CoreGui")
 
--- Главное окно
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 380, 0, 540)
 MainFrame.Position = UDim2.new(0.5, -190, 0.5, -270)
@@ -192,7 +216,6 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- Заголовок
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
@@ -202,7 +225,6 @@ Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 20
 Title.Parent = MainFrame
 
--- Кнопка закрытия
 local CloseButton = Instance.new("TextButton")
 CloseButton.Position = UDim2.new(1, -35, 0, 0)
 CloseButton.Size = UDim2.new(0, 35, 0, 35)
@@ -214,7 +236,7 @@ CloseButton.Font = Enum.Font.SourceSansBold
 CloseButton.TextSize = 20
 CloseButton.Parent = Title
 
--- ===== СТАТУС =====
+-- СТАТУС
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Position = UDim2.new(0, 10, 0, 45)
 StatusLabel.Size = UDim2.new(1, -20, 0, 22)
@@ -250,9 +272,7 @@ CharStatusLabel.TextSize = 12
 CharStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 CharStatusLabel.Parent = MainFrame
 
--- ===== КНОПКИ УПРАВЛЕНИЯ =====
-
--- Кнопка "УДАЛИТЬ ВСЁ"
+-- КНОПКИ
 local ClearMapBtn = Instance.new("TextButton")
 ClearMapBtn.Position = UDim2.new(0, 10, 0, 110)
 ClearMapBtn.Size = UDim2.new(0, 120, 0, 30)
@@ -264,7 +284,6 @@ ClearMapBtn.Font = Enum.Font.SourceSansBold
 ClearMapBtn.TextSize = 13
 ClearMapBtn.Parent = MainFrame
 
--- Кнопка "СТАРТ"
 local StartButton = Instance.new("TextButton")
 StartButton.Position = UDim2.new(0, 135, 0, 110)
 StartButton.Size = UDim2.new(0, 75, 0, 30)
@@ -276,7 +295,6 @@ StartButton.Font = Enum.Font.SourceSansBold
 StartButton.TextSize = 13
 StartButton.Parent = MainFrame
 
--- Кнопка "СТОП"
 local StopButton = Instance.new("TextButton")
 StopButton.Position = UDim2.new(0, 215, 0, 110)
 StopButton.Size = UDim2.new(0, 75, 0, 30)
@@ -288,7 +306,6 @@ StopButton.Font = Enum.Font.SourceSansBold
 StopButton.TextSize = 13
 StopButton.Parent = MainFrame
 
--- Кнопка "РЕДЖОЙН"
 local RejoinNowButton = Instance.new("TextButton")
 RejoinNowButton.Position = UDim2.new(0, 295, 0, 110)
 RejoinNowButton.Size = UDim2.new(0, 75, 0, 30)
@@ -300,34 +317,20 @@ RejoinNowButton.Font = Enum.Font.SourceSansBold
 RejoinNowButton.TextSize = 12
 RejoinNowButton.Parent = MainFrame
 
--- Кнопка "ВЫБРАТЬ ВСЕХ"
-local SelectAllBtn = Instance.new("TextButton")
-SelectAllBtn.Position = UDim2.new(0, 10, 0, 148)
-SelectAllBtn.Size = UDim2.new(0, 100, 0, 25)
-SelectAllBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
-SelectAllBtn.BorderSizePixel = 0
-SelectAllBtn.Text = "✓ ВСЕХ"
-SelectAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SelectAllBtn.Font = Enum.Font.SourceSans
-SelectAllBtn.TextSize = 12
-SelectAllBtn.Parent = MainFrame
+local ExcludeListBtn = Instance.new("TextButton")
+ExcludeListBtn.Position = UDim2.new(0, 10, 0, 148)
+ExcludeListBtn.Size = UDim2.new(0, 180, 0, 25)
+ExcludeListBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 0)
+ExcludeListBtn.BorderSizePixel = 0
+ExcludeListBtn.Text = "📝 ИСКЛЮЧЕНИЯ (" .. #ExcludedPlayers .. ")"
+ExcludeListBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExcludeListBtn.Font = Enum.Font.SourceSans
+ExcludeListBtn.TextSize = 12
+ExcludeListBtn.Parent = MainFrame
 
--- Кнопка "ОТМЕНИТЬ ВСЕХ"
-local DeselectAllBtn = Instance.new("TextButton")
-DeselectAllBtn.Position = UDim2.new(0, 115, 0, 148)
-DeselectAllBtn.Size = UDim2.new(0, 100, 0, 25)
-DeselectAllBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 50)
-DeselectAllBtn.BorderSizePixel = 0
-DeselectAllBtn.Text = "✕ ОТМЕНИТЬ"
-DeselectAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-DeselectAllBtn.Font = Enum.Font.SourceSans
-DeselectAllBtn.TextSize = 12
-DeselectAllBtn.Parent = MainFrame
-
--- Кнопка "АВТОРЕЖОЙН"
 local AutoRejoinBtn = Instance.new("TextButton")
-AutoRejoinBtn.Position = UDim2.new(0, 220, 0, 148)
-AutoRejoinBtn.Size = UDim2.new(0, 150, 0, 25)
+AutoRejoinBtn.Position = UDim2.new(0, 195, 0, 148)
+AutoRejoinBtn.Size = UDim2.new(0, 175, 0, 25)
 AutoRejoinBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
 AutoRejoinBtn.BorderSizePixel = 0
 AutoRejoinBtn.Text = "🔄 АВТО: ВКЛ"
@@ -336,8 +339,7 @@ AutoRejoinBtn.Font = Enum.Font.SourceSans
 AutoRejoinBtn.TextSize = 12
 AutoRejoinBtn.Parent = MainFrame
 
--- ===== СПИСОК ИГРОКОВ =====
-
+-- СПИСОК ИГРОКОВ
 local ListTitle = Instance.new("TextLabel")
 ListTitle.Position = UDim2.new(0, 10, 0, 182)
 ListTitle.Size = UDim2.new(1, -20, 0, 20)
@@ -366,42 +368,9 @@ PlayerScrollFrame.ScrollBarThickness = 6
 PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 PlayerScrollFrame.Parent = ListFrame
 
--- ===== ПЕРЕМЕННЫЕ ДЛЯ СПИСКА =====
 local PlayerListItems = {}
-local CurrentPlayerCount = 0
 
--- ========== ФУНКЦИИ GUI ==========
-
-local function UpdateStatus()
-    local count = 0
-    for _ in pairs(SelectedTargets) do count = count + 1 end
-    if FlingActive then
-        StatusLabel.Text = "⚔️ Убиваю " .. count .. " игроков..."
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-    else
-        StatusLabel.Text = "⏸ Остановлен" .. (count > 0 and " (выбрано " .. count .. " целей)" or "")
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
-    end
-end
-
-local function UpdateRejoinInfo(timeLeft)
-    local mins = math.floor(timeLeft / 60)
-    local secs = math.floor(timeLeft % 60)
-    InfoLabel.Text = string.format("Режойн через: %02d:%02d | Всего: %d", mins, secs, RejoinCount)
-end
-
-local function UpdateCharStatus(alive)
-    if alive then
-        CharStatusLabel.Text = "✅ Персонаж жив"
-        CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    else
-        CharStatusLabel.Text = "💀 Ожидание перерождения..."
-        CharStatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-    end
-end
-
--- ===== ОБНОВЛЕНИЕ СПИСКА =====
-
+-- ========== ОБНОВЛЕНИЕ СПИСКА ==========
 local function UpdatePlayerList()
     for _, item in pairs(PlayerListItems) do
         item:Destroy()
@@ -413,12 +382,23 @@ local function UpdatePlayerList()
     
     local yPos = 5
     local count = 0
+    local targetCount = 0
+    
+    UpdateTargetsList()
+    for _ in pairs(PlayersToFling) do targetCount = targetCount + 1 end
     
     for _, plr in ipairs(playerList) do
         local isSelf = (plr == Player)
-        local isSelected = SelectedTargets[plr.Name] ~= nil
-        local isAlive = false
+        local isExcluded = false
+        for _, excluded in ipairs(ExcludedPlayers) do
+            if plr.Name == excluded then
+                isExcluded = true
+                break
+            end
+        end
+        local isTarget = not isSelf and not isExcluded
         
+        local isAlive = false
         if plr.Character then
             local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
             if humanoid and humanoid.Health > 0 then
@@ -429,7 +409,16 @@ local function UpdatePlayerList()
         local Item = Instance.new("Frame")
         Item.Size = UDim2.new(1, -10, 0, 24)
         Item.Position = UDim2.new(0, 5, 0, yPos)
-        Item.BackgroundColor3 = isSelf and Color3.fromRGB(0, 60, 80) or (isSelected and Color3.fromRGB(60, 40, 60) or Color3.fromRGB(40, 40, 50))
+        
+        if isSelf then
+            Item.BackgroundColor3 = Color3.fromRGB(0, 60, 80)
+        elseif isExcluded then
+            Item.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+        elseif isTarget then
+            Item.BackgroundColor3 = Color3.fromRGB(40, 60, 40)
+        else
+            Item.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        end
         Item.BorderSizePixel = 0
         Item.Parent = PlayerScrollFrame
         
@@ -443,11 +432,16 @@ local function UpdatePlayerList()
         StatusIcon.Parent = Item
         
         local NameLabel = Instance.new("TextLabel")
-        NameLabel.Size = UDim2.new(1, -70, 1, 0)
+        NameLabel.Size = UDim2.new(1, -90, 1, 0)
         NameLabel.Position = UDim2.new(0, 24, 0, 0)
         NameLabel.BackgroundTransparency = 1
-        NameLabel.Text = plr.Name .. (isSelf and " (ВЫ)" or "")
-        NameLabel.TextColor3 = isSelf and Color3.fromRGB(100, 200, 255) or (isSelected and Color3.fromRGB(255, 200, 100) or Color3.fromRGB(200, 200, 200))
+        local nameText = plr.Name
+        if isSelf then nameText = nameText .. " (ВЫ)" end
+        if isExcluded then nameText = nameText .. " 🚫" end
+        NameLabel.Text = nameText
+        NameLabel.TextColor3 = isSelf and Color3.fromRGB(100, 200, 255) or 
+                              (isExcluded and Color3.fromRGB(255, 100, 100) or
+                              (isTarget and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(200, 200, 200)))
         NameLabel.TextSize = 13
         NameLabel.Font = Enum.Font.SourceSans
         NameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -457,61 +451,29 @@ local function UpdatePlayerList()
         CheckIcon.Size = UDim2.new(0, 30, 1, 0)
         CheckIcon.Position = UDim2.new(1, -32, 0, 0)
         CheckIcon.BackgroundTransparency = 1
-        CheckIcon.Text = isSelected and "✅" or (isSelf and "⭐" or "⬜")
+        if isSelf then
+            CheckIcon.Text = "⭐"
+        elseif isExcluded then
+            CheckIcon.Text = "🚫"
+        elseif isTarget then
+            CheckIcon.Text = "✅"
+        else
+            CheckIcon.Text = "⬜"
+        end
         CheckIcon.TextSize = 14
         CheckIcon.Font = Enum.Font.SourceSans
         CheckIcon.Parent = Item
-        
-        if not isSelf then
-            local ClickArea = Instance.new("TextButton")
-            ClickArea.Size = UDim2.new(1, 0, 1, 0)
-            ClickArea.BackgroundTransparency = 1
-            ClickArea.Text = ""
-            ClickArea.ZIndex = 2
-            ClickArea.Parent = Item
-            
-            ClickArea.MouseButton1Click:Connect(function()
-                if SelectedTargets[plr.Name] then
-                    SelectedTargets[plr.Name] = nil
-                else
-                    if plr.Character then
-                        local h = plr.Character:FindFirstChildOfClass("Humanoid")
-                        if h and h.Health > 0 then
-                            SelectedTargets[plr.Name] = plr
-                        else
-                            Message("Ошибка", plr.Name .. " мёртв!", 2)
-                        end
-                    else
-                        SelectedTargets[plr.Name] = plr
-                    end
-                end
-                UpdateStatus()
-                UpdatePlayerList()
-            end)
-        end
         
         table.insert(PlayerListItems, Item)
         yPos = yPos + 28
         count = count + 1
     end
     
-    CurrentPlayerCount = count
-    ListTitle.Text = "📋 ИГРОКИ (" .. count .. ")"
+    ListTitle.Text = "📋 ИГРОКИ (" .. count .. ") | ЦЕЛЕЙ: " .. targetCount
     PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
 end
 
--- ========== ОСТАЛЬНЫЕ ФУНКЦИИ ==========
-
-local function Message(Title, Text, Time)
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = Title,
-        Text = Text,
-        Duration = Time or 3
-    })
-end
-
 -- ========== МЕХАНИКА ФЛИНГА ==========
-
 local function SkidFling(TargetPlayer)
     local Character = Player.Character
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
@@ -628,20 +590,31 @@ local function SkidFling(TargetPlayer)
 end
 
 -- ========== УПРАВЛЕНИЕ ФЛИНГОМ ==========
-
 local function StartFling()
     if FlingActive then return end
     
+    UpdateTargetsList()
     local count = 0
-    for _ in pairs(SelectedTargets) do count = count + 1 end
+    for _ in pairs(PlayersToFling) do count = count + 1 end
+    
     if count == 0 then
-        Message("Ошибка", "Нет выбранных целей! Нажми 'ВСЕХ'", 2)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Ошибка",
+            Text = "Нет целей для флинга!",
+            Duration = 2
+        })
         return
     end
     
     FlingActive = true
-    UpdateStatus()
-    Message("Старт", "Флингуется " .. count .. " целей", 2)
+    StatusLabel.Text = "⚔️ Убиваю " .. count .. " игроков..."
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+    
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Старт",
+        Text = "Флингуется " .. count .. " целей",
+        Duration = 2
+    })
     
     spawn(function()
         while FlingActive do
@@ -649,22 +622,25 @@ local function StartFling()
             local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
             
             if not Character or not Humanoid or Humanoid.Health <= 0 then
-                UpdateCharStatus(false)
+                CharStatusLabel.Text = "💀 Ожидание перерождения..."
+                CharStatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
                 wait(2)
                 continue
             else
-                UpdateCharStatus(true)
+                CharStatusLabel.Text = "✅ Персонаж жив"
+                CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
             end
             
+            UpdateTargetsList()
             local validTargets = {}
-            for name, player in pairs(SelectedTargets) do
+            for name, player in pairs(PlayersToFling) do
                 if player and player.Parent and player.Character then
                     local targetHumanoid = player.Character:FindFirstChildOfClass("Humanoid")
                     if targetHumanoid and targetHumanoid.Health > 0 then
                         validTargets[name] = player
                     end
                 else
-                    SelectedTargets[name] = nil
+                    PlayersToFling[name] = nil
                 end
             end
             
@@ -679,7 +655,9 @@ local function StartFling()
                 wait(0.1)
             end
             
-            UpdateStatus()
+            local cnt = 0
+            for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
+            StatusLabel.Text = "⚔️ Убиваю " .. cnt .. " игроков..."
             UpdatePlayerList()
             wait(0.5)
         end
@@ -689,83 +667,30 @@ end
 local function StopFling()
     if not FlingActive then return end
     FlingActive = false
-    UpdateStatus()
-    Message("Стоп", "Флинг остановлен", 2)
-end
-
--- ========== ВЫБОР ИГРОКОВ ==========
-
-local function SelectAllPlayers()
-    SelectedTargets = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= Player then
-            if player.Character then
-                local h = player.Character:FindFirstChildOfClass("Humanoid")
-                if h and h.Health > 0 then
-                    SelectedTargets[player.Name] = player
-                else
-                    SelectedTargets[player.Name] = player
-                end
-            else
-                SelectedTargets[player.Name] = player
-            end
-        end
-    end
-    UpdateStatus()
-    UpdatePlayerList()
-    Message("Цели выбраны", "Выбрано " .. #Players:GetPlayers() - 1 .. " игроков", 2)
-end
-
-local function DeselectAllPlayers()
-    SelectedTargets = {}
-    UpdateStatus()
-    UpdatePlayerList()
-    Message("Отменено", "Все цели отменены", 2)
+    StatusLabel.Text = "⏸ Остановлен"
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Стоп",
+        Text = "Флинг остановлен",
+        Duration = 2
+    })
 end
 
 -- ========== РЕДЖОЙН ==========
-
 local function PerformRejoin(instant)
-    if instant then
-        if FlingActive then StopFling() end
-        RejoinCount = RejoinCount + 1
-        PlatformCreated = false
-        Message("⚡ РЕДЖОЙН", "Перезаход #" .. RejoinCount, 2)
-        TeleportService:Teleport(game.PlaceId, Player)
-    else
-        if FlingActive then StopFling() end
-        RejoinCount = RejoinCount + 1
-        PlatformCreated = false
-        Message("Режойн", "Перезаход #" .. RejoinCount, 3)
-        wait(3)
-        TeleportService:Teleport(game.PlaceId, Player)
-    end
+    if FlingActive then StopFling() end
+    RejoinCount = RejoinCount + 1
+    PlatformCreated = false
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = instant and "⚡ РЕДЖОЙН" or "Режойн",
+        Text = "Перезаход #" .. RejoinCount,
+        Duration = 2
+    })
+    if not instant then wait(3) end
+    TeleportService:Teleport(game.PlaceId, Player)
 end
 
--- ========== ВОССТАНОВЛЕНИЕ ==========
-
-local function RestoreAfterRespawn()
-    UpdateCharStatus(true)
-    Message("Восстановление", "Персонаж переродился!", 2)
-    wait(2)
-    
-    local count = 0
-    for _ in pairs(SelectedTargets) do count = count + 1 end
-    if count == 0 then
-        SelectAllPlayers()
-    end
-    
-    if not FlingActive then
-        wait(1)
-        StartFling()
-    end
-    
-    UpdatePlayerList()
-    Message("✅ Восстановлено", "Флинг продолжается!", 2)
-end
-
--- ========== ТАЙМЕР ==========
-
+-- ========== ТАЙМЕР РЕДЖОЙНА ==========
 local function StartRejoinTimer()
     if RejoinTimer then
         RejoinTimer:Disconnect()
@@ -783,14 +708,15 @@ local function StartRejoinTimer()
                 return
             end
             if math.floor(timeLeft) % 5 == 0 then
-                UpdateRejoinInfo(timeLeft)
+                local mins = math.floor(timeLeft / 60)
+                local secs = math.floor(timeLeft % 60)
+                InfoLabel.Text = string.format("Режойн через: %02d:%02d | Всего: %d", mins, secs, RejoinCount)
             end
         end
     end)
 end
 
--- ========== ОБРАБОТЧИКИ ==========
-
+-- ========== ОБРАБОТЧИКИ GUI ==========
 ClearMapBtn.MouseButton1Click:Connect(function()
     ClearEverything()
 end)
@@ -802,8 +728,21 @@ RejoinNowButton.MouseButton1Click:Connect(function()
     PerformRejoin(true)
 end)
 
-SelectAllBtn.MouseButton1Click:Connect(SelectAllPlayers)
-DeselectAllBtn.MouseButton1Click:Connect(DeselectAllPlayers)
+ExcludeListBtn.MouseButton1Click:Connect(function()
+    local msg = "Исключения:\n"
+    if #ExcludedPlayers == 0 then
+        msg = msg .. "(пусто)"
+    else
+        for _, name in ipairs(ExcludedPlayers) do
+            msg = msg .. "• " .. name .. "\n"
+        end
+    end
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "📝 Список исключений",
+        Text = msg,
+        Duration = 5
+    })
+end)
 
 AutoRejoinBtn.MouseButton1Click:Connect(function()
     AutoRejoinActive = not AutoRejoinActive
@@ -811,13 +750,21 @@ AutoRejoinBtn.MouseButton1Click:Connect(function()
     AutoRejoinBtn.BackgroundColor3 = AutoRejoinActive and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(100, 0, 0)
     if AutoRejoinActive then
         StartRejoinTimer()
-        Message("Авторежойн", "Включён (каждые 10 мин)", 2)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Авторежойн",
+            Text = "Включён (каждые 10 мин)",
+            Duration = 2
+        })
     else
         if RejoinTimer then
             RejoinTimer:Disconnect()
             RejoinTimer = nil
         end
-        Message("Авторежойн", "Выключен", 2)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Авторежойн",
+            Text = "Выключен",
+            Duration = 2
+        })
     end
 end)
 
@@ -827,31 +774,61 @@ CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
+-- ========== ОБРАБОТЧИКИ ИГРОКОВ ==========
 Players.PlayerAdded:Connect(function()
     wait(1)
     UpdatePlayerList()
-    UpdateStatus()
+    UpdateTargetsList()
+    local cnt = 0
+    for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
+    StatusLabel.Text = FlingActive and ("⚔️ Убиваю " .. cnt .. " игроков...") or "⏸ Остановлен"
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-    if SelectedTargets[player.Name] then
-        SelectedTargets[player.Name] = nil
+    if PlayersToFling[player.Name] then
+        PlayersToFling[player.Name] = nil
     end
     wait(1)
     UpdatePlayerList()
-    UpdateStatus()
+    local cnt = 0
+    for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
+    StatusLabel.Text = FlingActive and ("⚔️ Убиваю " .. cnt .. " игроков...") or "⏸ Остановлен"
 end)
 
+-- ========== ВОССТАНОВЛЕНИЕ ПОСЛЕ СМЕРТИ ==========
 Player.CharacterAdded:Connect(function(character)
     print("[Скрипт] Персонаж переродился!")
     local humanoid = character:WaitForChild("Humanoid")
-    UpdateCharStatus(true)
+    CharStatusLabel.Text = "✅ Персонаж жив"
+    CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
     wait(2)
-    RestoreAfterRespawn()
+    
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Восстановление",
+        Text = "Персонаж переродился! Продолжаем флинг.",
+        Duration = 2
+    })
+    
+    UpdateTargetsList()
+    local cnt = 0
+    for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
+    
+    if not FlingActive and cnt > 0 then
+        wait(1)
+        StartFling()
+    end
+    
+    UpdatePlayerList()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "✅ Восстановлено",
+        Text = "Флинг продолжается!",
+        Duration = 2
+    })
     
     humanoid.Died:Connect(function()
         print("[Скрипт] Персонаж умер!")
-        UpdateCharStatus(false)
+        CharStatusLabel.Text = "💀 Ожидание перерождения..."
+        CharStatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
         if FlingActive then
             FlingActive = false
         end
@@ -861,10 +838,12 @@ end)
 if Player.Character then
     local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
     if humanoid then
-        UpdateCharStatus(true)
+        CharStatusLabel.Text = "✅ Персонаж жив"
+        CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         humanoid.Died:Connect(function()
             print("[Скрипт] Персонаж умер!")
-            UpdateCharStatus(false)
+            CharStatusLabel.Text = "💀 Ожидание перерождения..."
+            CharStatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
             if FlingActive then
                 FlingActive = false
             end
@@ -873,33 +852,48 @@ if Player.Character then
 end
 
 -- ========== ЗАПУСК ==========
-
 spawn(function()
-    wait(3)
+    wait(2)
+    
+    -- УДАЛЯЕМ КАРТУ СРАЗУ
+    ClearEverything()
+    
+    wait(1)
     UpdatePlayerList()
+    UpdateTargetsList()
     
     local char = Player.Character
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
     
     if char and humanoid and humanoid.Health > 0 then
-        UpdateCharStatus(true)
-        SelectAllPlayers()
+        CharStatusLabel.Text = "✅ Персонаж жив"
+        CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         wait(1)
         StartFling()
         StartRejoinTimer()
-        Message("🔥 АВТО-УБИЙСТВО", "Скрипт активен!", 5)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🔥 АВТО-УБИЙСТВО",
+            Text = "Скрипт активен! Карта удалена!",
+            Duration = 5
+        })
     else
-        Message("⏳ Ожидание", "Жду появления персонажа...", 3)
+        CharStatusLabel.Text = "⏳ Ожидание персонажа..."
+        CharStatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
         local character = Player.CharacterAdded:Wait()
         character:WaitForChild("Humanoid")
         wait(2)
-        UpdateCharStatus(true)
-        SelectAllPlayers()
+        CharStatusLabel.Text = "✅ Персонаж жив"
+        CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         wait(1)
         StartFling()
         StartRejoinTimer()
-        Message("🔥 АВТО-УБИЙСТВО", "Скрипт активен!", 5)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🔥 АВТО-УБИЙСТВО",
+            Text = "Скрипт активен! Карта удалена!",
+            Duration = 5
+        })
     end
 end)
 
 print("🔥 АВТО-ФЛИНГ АКТИВИРОВАН! ВСЕ ФУНКЦИИ ЗАГРУЖЕНЫ!")
+print("📝 Исключений: " .. #ExcludedPlayers)
