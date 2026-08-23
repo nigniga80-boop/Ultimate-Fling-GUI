@@ -20,6 +20,7 @@ local TeleportCheck = false
 local KeepInfYield = true
 
 local SCRIPT_URL = 'https://raw.githubusercontent.com/nigniga80-boop/Ultimate-Fling-GUI/refs/heads/main/luaaa'
+local LastServerId = game.JobId
 
 Players.LocalPlayer.OnTeleport:Connect(function(State)
     if KeepInfYield and (not TeleportCheck) then
@@ -54,10 +55,28 @@ local function GetRandomServer()
 
     local data = game:GetService("HttpService"):JSONDecode(result)
     local servers = {}
+    local currentServer = game.JobId
 
     if data and data.data then
         for _, server in ipairs(data.data) do
-            if server.id ~= game.JobId then
+            -- Исключаем текущий сервер и сервер, на котором уже были
+            if server.id ~= currentServer and server.id ~= LastServerId then
+                local playerCount = server.playing or 0
+                if playerCount < server.maxPlayers then
+                    table.insert(servers, server.id)
+                end
+            end
+        end
+    end
+
+    if #servers > 0 then
+        return servers[math.random(1, #servers)]
+    end
+    
+    -- Если нет других серверов, пробуем найти любой сервер кроме текущего
+    if data and data.data then
+        for _, server in ipairs(data.data) do
+            if server.id ~= currentServer then
                 local playerCount = server.playing or 0
                 if playerCount < server.maxPlayers then
                     table.insert(servers, server.id)
@@ -687,14 +706,13 @@ local function PerformRejoin(instant)
     local newServerId = GetRandomServer()
 
     if newServerId then
+        LastServerId = newServerId
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "✅ Сервер найден",
             Text = "Переход на новый сервер...",
             Duration = 2
         })
         if not instant then wait(2) end
-        -- Используем Teleport с параметром true для перехода на новый сервер
-        -- queue_on_teleport сработает при загрузке
         TeleportService:Teleport(game.PlaceId, Player, nil, nil, nil, nil, nil, nil, nil, nil, true)
     else
         game:GetService("StarterGui"):SetCore("SendNotification", {
