@@ -4,21 +4,18 @@
     + РАБОТАЕТ НА ВСЕХ, КРОМЕ СПИСКА ИСКЛЮЧЕНИЙ
 ]]
 
--- ========== СЛУЖБЫ ==========
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local Player = Players.LocalPlayer
 local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
 
--- ========== СПИСОК ИСКЛЮЧЕНИЙ (НЕ ТРОГАТЬ) ==========
 local ExcludedPlayers = {
-    -- Добавляй сюда имена игроков, которых НЕ нужно флингать
     -- "PlayerName1",
     -- "PlayerName2",
 }
 
--- ========== ТЕЛЕПОРТ ХУК (QUEUE_ON_TELEPORT) ==========
 local TeleportCheck = false
 local KeepInfYield = true
 
@@ -33,19 +30,47 @@ Players.LocalPlayer.OnTeleport:Connect(function(State)
     end
 end)
 
--- ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 local FlingActive = false
 local RejoinTimer = nil
 local RejoinCount = 0
 local AutoRejoinActive = true
 local IsRespawning = false
 local PlatformCreated = false
-local PlayersToFling = {} -- Все игроки кроме исключений
+local PlayersToFling = {}
 
 getgenv().OldPos = nil
 getgenv().FPDH = workspace.FallenPartsDestroyHeight
 
--- ========== ФУНКЦИЯ ОБНОВЛЕНИЯ СПИСКА ЦЕЛЕЙ ==========
+local function GetRandomServer()
+    local success, result = pcall(function()
+        return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?limit=100")
+    end)
+    
+    if not success then
+        return nil
+    end
+    
+    local data = game:GetService("HttpService"):JSONDecode(result)
+    local servers = {}
+    
+    if data and data.data then
+        for _, server in ipairs(data.data) do
+            if server.id ~= game.JobId then
+                local playerCount = server.playing or 0
+                if playerCount < server.maxPlayers then
+                    table.insert(servers, server.id)
+                end
+            end
+        end
+    end
+    
+    if #servers > 0 then
+        return servers[math.random(1, #servers)]
+    end
+    
+    return nil
+end
+
 local function UpdateTargetsList()
     PlayersToFling = {}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -65,21 +90,15 @@ local function UpdateTargetsList()
     return #PlayersToFling
 end
 
--- ========== АГРЕССИВНОЕ УДАЛЕНИЕ КАРТЫ ==========
 local function ClearEverything()
     if PlatformCreated then return end
     
     pcall(function()
-        print("🔥 НАЧИНАЮ УДАЛЕНИЕ ВСЕЙ КАРТЫ...")
-        
-        -- === 1. УДАЛЕНИЕ ТЕРРЕЙНА ===
         local terrain = workspace:FindFirstChild("Terrain")
         if terrain then
             terrain:Clear()
-            print("✅ Террейн очищен")
         end
         
-        -- === 2. УДАЛЕНИЕ ВСЕГО В WORKSPACE ===
         local objectsToDelete = {}
         for _, child in ipairs(workspace:GetChildren()) do
             if child ~= Player.Character then
@@ -92,22 +111,18 @@ local function ClearEverything()
                         end
                     end
                 end
-                if not isPlayerPart then
+                if not isPlayerPart and child ~= workspace.CurrentCamera then
                     table.insert(objectsToDelete, child)
                 end
             end
         end
         
-        local deletedCount = 0
         for _, obj in ipairs(objectsToDelete) do
             pcall(function()
                 obj:Destroy()
-                deletedCount = deletedCount + 1
             end)
         end
-        print("✅ Удалено объектов: " .. deletedCount)
         
-        -- === 3. ОЧИСТКА LIGHTING ===
         for _, child in ipairs(Lighting:GetChildren()) do
             if child:IsA("Effect") or child:IsA("BloomEffect") or child:IsA("BlurEffect") or 
                child:IsA("ColorCorrectionEffect") or child:IsA("SunRaysEffect") or child:IsA("Sky") then
@@ -115,14 +130,12 @@ local function ClearEverything()
             end
         end
         
-        -- === 4. УДАЛЕНИЕ ВСЕХ ЭФФЕКТОВ ===
         local effects = workspace:FindFirstChild("Effects")
         if effects then effects:Destroy() end
         
         local debris = workspace:FindFirstChild("Debris")
         if debris then debris:Destroy() end
         
-        -- === 5. СОЗДАНИЕ ОГРОМНОЙ ПЛАТФОРМЫ ===
         local platform = Instance.new("Part")
         platform.Name = "SoloPlatform"
         platform.Size = Vector3.new(200, 2, 200)
@@ -147,9 +160,6 @@ local function ClearEverything()
         pointLight2.Position = Vector3.new(0, 5, 0)
         pointLight2.Parent = platform
         
-        print("✅ Платформа создана")
-        
-        -- === 6. СОЗДАНИЕ МАЛЕНЬКОЙ ПЛАТФОРМЫ ПОД ИГРОКА ===
         local playerPart = Instance.new("Part")
         playerPart.Name = "PlayerPlatform"
         playerPart.Size = Vector3.new(10, 1, 10)
@@ -167,17 +177,12 @@ local function ClearEverything()
         pointLight3.Range = 20
         pointLight3.Parent = playerPart
         
-        print("✅ Игровая платформа создана")
-        
-        -- === 7. ПЕРЕМЕЩЕНИЕ ИГРОКА ===
         task.wait(0.5)
         local char = Player.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             char.HumanoidRootPart.Position = Vector3.new(0, 3, 0)
-            print("✅ Игрок перемещён на платформу")
         end
         
-        -- === 8. УСТАНОВКА НЕБА ===
         local sky = Instance.new("Sky")
         sky.SkyboxBk = "rbxassetid://4022045180"
         sky.SkyboxDn = "rbxassetid://4022045180"
@@ -192,7 +197,6 @@ local function ClearEverything()
         Lighting.OutdoorAmbient = Color3.fromRGB(80, 80, 120)
         
         PlatformCreated = true
-        print("✅ КАРТА ПОЛНОСТЬЮ УДАЛЕНА! ОСТАЛАСЬ ТОЛЬКО ПЛАТФОРМА!")
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "🗺️ КАРТА УДАЛЕНА",
             Text = "Осталась только твоя платформа!",
@@ -201,7 +205,6 @@ local function ClearEverything()
     end)
 end
 
--- ========== GUI ==========
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoFlingGUI"
 ScreenGui.ResetOnSpawn = false
@@ -236,7 +239,6 @@ CloseButton.Font = Enum.Font.SourceSansBold
 CloseButton.TextSize = 20
 CloseButton.Parent = Title
 
--- СТАТУС
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Position = UDim2.new(0, 10, 0, 45)
 StatusLabel.Size = UDim2.new(1, -20, 0, 22)
@@ -248,7 +250,6 @@ StatusLabel.TextSize = 15
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 StatusLabel.Parent = MainFrame
 
--- Инфо о реджойне
 local InfoLabel = Instance.new("TextLabel")
 InfoLabel.Position = UDim2.new(0, 10, 0, 67)
 InfoLabel.Size = UDim2.new(1, -20, 0, 18)
@@ -260,7 +261,6 @@ InfoLabel.TextSize = 12
 InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 InfoLabel.Parent = MainFrame
 
--- Статус персонажа
 local CharStatusLabel = Instance.new("TextLabel")
 CharStatusLabel.Position = UDim2.new(0, 10, 0, 85)
 CharStatusLabel.Size = UDim2.new(1, -20, 0, 16)
@@ -272,7 +272,6 @@ CharStatusLabel.TextSize = 12
 CharStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 CharStatusLabel.Parent = MainFrame
 
--- КНОПКИ
 local ClearMapBtn = Instance.new("TextButton")
 ClearMapBtn.Position = UDim2.new(0, 10, 0, 110)
 ClearMapBtn.Size = UDim2.new(0, 120, 0, 30)
@@ -339,7 +338,6 @@ AutoRejoinBtn.Font = Enum.Font.SourceSans
 AutoRejoinBtn.TextSize = 12
 AutoRejoinBtn.Parent = MainFrame
 
--- СПИСОК ИГРОКОВ
 local ListTitle = Instance.new("TextLabel")
 ListTitle.Position = UDim2.new(0, 10, 0, 182)
 ListTitle.Size = UDim2.new(1, -20, 0, 20)
@@ -370,7 +368,6 @@ PlayerScrollFrame.Parent = ListFrame
 
 local PlayerListItems = {}
 
--- ========== ОБНОВЛЕНИЕ СПИСКА ==========
 local function UpdatePlayerList()
     for _, item in pairs(PlayerListItems) do
         item:Destroy()
@@ -473,7 +470,6 @@ local function UpdatePlayerList()
     PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
 end
 
--- ========== МЕХАНИКА ФЛИНГА ==========
 local function SkidFling(TargetPlayer)
     local Character = Player.Character
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
@@ -589,7 +585,6 @@ local function SkidFling(TargetPlayer)
     return true
 end
 
--- ========== УПРАВЛЕНИЕ ФЛИНГОМ ==========
 local function StartFling()
     if FlingActive then return end
     
@@ -676,21 +671,38 @@ local function StopFling()
     })
 end
 
--- ========== РЕДЖОЙН ==========
 local function PerformRejoin(instant)
     if FlingActive then StopFling() end
     RejoinCount = RejoinCount + 1
     PlatformCreated = false
+    
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = instant and "⚡ РЕДЖОЙН" or "Режойн",
-        Text = "Перезаход #" .. RejoinCount,
+        Text = "Поиск нового сервера #" .. RejoinCount .. "...",
         Duration = 2
     })
-    if not instant then wait(3) end
-    TeleportService:Teleport(game.PlaceId, Player)
+    
+    local newServerId = GetRandomServer()
+    
+    if newServerId then
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "✅ Сервер найден",
+            Text = "Переход на новый сервер...",
+            Duration = 2
+        })
+        if not instant then wait(2) end
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, newServerId, Player)
+    else
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "⚠️ Не найден новый сервер",
+            Text = "Попытка реджойна на случайный сервер...",
+            Duration = 3
+        })
+        if not instant then wait(2) end
+        TeleportService:Teleport(game.PlaceId, Player, nil, nil, nil, nil, nil, nil, nil, nil, true)
+    end
 end
 
--- ========== ТАЙМЕР РЕДЖОЙНА ==========
 local function StartRejoinTimer()
     if RejoinTimer then
         RejoinTimer:Disconnect()
@@ -716,7 +728,6 @@ local function StartRejoinTimer()
     end)
 end
 
--- ========== ОБРАБОТЧИКИ GUI ==========
 ClearMapBtn.MouseButton1Click:Connect(function()
     ClearEverything()
 end)
@@ -774,30 +785,38 @@ CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- ========== ОБРАБОТЧИКИ ИГРОКОВ ==========
-Players.PlayerAdded:Connect(function()
-    wait(1)
+Players.PlayerAdded:Connect(function(player)
+    wait(0.5)
     UpdatePlayerList()
     UpdateTargetsList()
-    local cnt = 0
-    for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
-    StatusLabel.Text = FlingActive and ("⚔️ Убиваю " .. cnt .. " игроков...") or "⏸ Остановлен"
+    
+    if FlingActive then
+        local cnt = 0
+        for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
+        StatusLabel.Text = "⚔️ Убиваю " .. cnt .. " игроков..."
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "👤 Новый игрок",
+            Text = player.Name .. " добавлен в список целей!",
+            Duration = 2
+        })
+    end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
     if PlayersToFling[player.Name] then
         PlayersToFling[player.Name] = nil
     end
-    wait(1)
+    wait(0.5)
     UpdatePlayerList()
-    local cnt = 0
-    for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
-    StatusLabel.Text = FlingActive and ("⚔️ Убиваю " .. cnt .. " игроков...") or "⏸ Остановлен"
+    if FlingActive then
+        local cnt = 0
+        for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
+        StatusLabel.Text = "⚔️ Убиваю " .. cnt .. " игроков..."
+    end
 end)
 
--- ========== ВОССТАНОВЛЕНИЕ ПОСЛЕ СМЕРТИ ==========
 Player.CharacterAdded:Connect(function(character)
-    print("[Скрипт] Персонаж переродился!")
     local humanoid = character:WaitForChild("Humanoid")
     CharStatusLabel.Text = "✅ Персонаж жив"
     CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
@@ -826,7 +845,6 @@ Player.CharacterAdded:Connect(function(character)
     })
     
     humanoid.Died:Connect(function()
-        print("[Скрипт] Персонаж умер!")
         CharStatusLabel.Text = "💀 Ожидание перерождения..."
         CharStatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
         if FlingActive then
@@ -841,7 +859,6 @@ if Player.Character then
         CharStatusLabel.Text = "✅ Персонаж жив"
         CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         humanoid.Died:Connect(function()
-            print("[Скрипт] Персонаж умер!")
             CharStatusLabel.Text = "💀 Ожидание перерождения..."
             CharStatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
             if FlingActive then
@@ -851,11 +868,9 @@ if Player.Character then
     end
 end
 
--- ========== ЗАПУСК ==========
 spawn(function()
     wait(2)
     
-    -- УДАЛЯЕМ КАРТУ СРАЗУ
     ClearEverything()
     
     wait(1)
