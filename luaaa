@@ -19,6 +19,8 @@ local ExcludedPlayers = {
 local TeleportCheck = false
 local KeepInfYield = true
 
+local SCRIPT_URL = 'https://raw.githubusercontent.com/nigniga80-boop/Ultimate-Fling-GUI/refs/heads/main/luaaa'
+
 Players.LocalPlayer.OnTeleport:Connect(function(State)
     if KeepInfYield and (not TeleportCheck) then
         TeleportCheck = true
@@ -45,14 +47,14 @@ local function GetRandomServer()
     local success, result = pcall(function()
         return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?limit=100")
     end)
-    
+
     if not success then
         return nil
     end
-    
+
     local data = game:GetService("HttpService"):JSONDecode(result)
     local servers = {}
-    
+
     if data and data.data then
         for _, server in ipairs(data.data) do
             if server.id ~= game.JobId then
@@ -63,11 +65,11 @@ local function GetRandomServer()
             end
         end
     end
-    
+
     if #servers > 0 then
         return servers[math.random(1, #servers)]
     end
-    
+
     return nil
 end
 
@@ -92,13 +94,13 @@ end
 
 local function ClearEverything()
     if PlatformCreated then return end
-    
+
     pcall(function()
         local terrain = workspace:FindFirstChild("Terrain")
         if terrain then
             terrain:Clear()
         end
-        
+
         local objectsToDelete = {}
         for _, child in ipairs(workspace:GetChildren()) do
             if child ~= Player.Character then
@@ -116,26 +118,26 @@ local function ClearEverything()
                 end
             end
         end
-        
+
         for _, obj in ipairs(objectsToDelete) do
             pcall(function()
                 obj:Destroy()
             end)
         end
-        
+
         for _, child in ipairs(Lighting:GetChildren()) do
             if child:IsA("Effect") or child:IsA("BloomEffect") or child:IsA("BlurEffect") or 
                child:IsA("ColorCorrectionEffect") or child:IsA("SunRaysEffect") or child:IsA("Sky") then
                 pcall(function() child:Destroy() end)
             end
         end
-        
+
         local effects = workspace:FindFirstChild("Effects")
         if effects then effects:Destroy() end
-        
+
         local debris = workspace:FindFirstChild("Debris")
         if debris then debris:Destroy() end
-        
+
         local platform = Instance.new("Part")
         platform.Name = "SoloPlatform"
         platform.Size = Vector3.new(200, 2, 200)
@@ -146,20 +148,20 @@ local function ClearEverything()
         platform.Material = Enum.Material.SmoothPlastic
         platform.BrickColor = BrickColor.new("Bright blue")
         platform.Parent = workspace
-        
+
         local pointLight = Instance.new("PointLight")
         pointLight.Color = Color3.fromRGB(0, 100, 255)
         pointLight.Brightness = 5
         pointLight.Range = 100
         pointLight.Parent = platform
-        
+
         local pointLight2 = Instance.new("PointLight")
         pointLight2.Color = Color3.fromRGB(255, 200, 100)
         pointLight2.Brightness = 3
         pointLight2.Range = 80
         pointLight2.Position = Vector3.new(0, 5, 0)
         pointLight2.Parent = platform
-        
+
         local playerPart = Instance.new("Part")
         playerPart.Name = "PlayerPlatform"
         playerPart.Size = Vector3.new(10, 1, 10)
@@ -170,19 +172,19 @@ local function ClearEverything()
         playerPart.Material = Enum.Material.Glass
         playerPart.BrickColor = BrickColor.new("New Yeller")
         playerPart.Parent = workspace
-        
+
         local pointLight3 = Instance.new("PointLight")
         pointLight3.Color = Color3.fromRGB(255, 200, 50)
         pointLight3.Brightness = 4
         pointLight3.Range = 20
         pointLight3.Parent = playerPart
-        
+
         task.wait(0.5)
         local char = Player.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             char.HumanoidRootPart.Position = Vector3.new(0, 3, 0)
         end
-        
+
         local sky = Instance.new("Sky")
         sky.SkyboxBk = "rbxassetid://4022045180"
         sky.SkyboxDn = "rbxassetid://4022045180"
@@ -191,11 +193,11 @@ local function ClearEverything()
         sky.SkyboxRt = "rbxassetid://4022045180"
         sky.SkyboxUp = "rbxassetid://4022045180"
         sky.Parent = Lighting
-        
+
         Lighting.Brightness = 0.5
         Lighting.Ambient = Color3.fromRGB(80, 80, 120)
         Lighting.OutdoorAmbient = Color3.fromRGB(80, 80, 120)
-        
+
         PlatformCreated = true
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "🗺️ КАРТА УДАЛЕНА",
@@ -373,17 +375,17 @@ local function UpdatePlayerList()
         item:Destroy()
     end
     PlayerListItems = {}
-    
+
     local playerList = Players:GetPlayers()
     table.sort(playerList, function(a, b) return a.Name:lower() < b.Name:lower() end)
-    
+
     local yPos = 5
     local count = 0
     local targetCount = 0
-    
+
     UpdateTargetsList()
     for _ in pairs(PlayersToFling) do targetCount = targetCount + 1 end
-    
+
     for _, plr in ipairs(playerList) do
         local isSelf = (plr == Player)
         local isExcluded = false
@@ -394,7 +396,7 @@ local function UpdatePlayerList()
             end
         end
         local isTarget = not isSelf and not isExcluded
-        
+
         local isAlive = false
         if plr.Character then
             local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
@@ -402,11 +404,11 @@ local function UpdatePlayerList()
                 isAlive = true
             end
         end
-        
+
         local Item = Instance.new("Frame")
         Item.Size = UDim2.new(1, -10, 0, 24)
         Item.Position = UDim2.new(0, 5, 0, yPos)
-        
+
         if isSelf then
             Item.BackgroundColor3 = Color3.fromRGB(0, 60, 80)
         elseif isExcluded then
@@ -418,7 +420,7 @@ local function UpdatePlayerList()
         end
         Item.BorderSizePixel = 0
         Item.Parent = PlayerScrollFrame
-        
+
         local StatusIcon = Instance.new("TextLabel")
         StatusIcon.Size = UDim2.new(0, 20, 1, 0)
         StatusIcon.Position = UDim2.new(0, 2, 0, 0)
@@ -427,7 +429,7 @@ local function UpdatePlayerList()
         StatusIcon.TextSize = 14
         StatusIcon.Font = Enum.Font.SourceSans
         StatusIcon.Parent = Item
-        
+
         local NameLabel = Instance.new("TextLabel")
         NameLabel.Size = UDim2.new(1, -90, 1, 0)
         NameLabel.Position = UDim2.new(0, 24, 0, 0)
@@ -443,7 +445,7 @@ local function UpdatePlayerList()
         NameLabel.Font = Enum.Font.SourceSans
         NameLabel.TextXAlignment = Enum.TextXAlignment.Left
         NameLabel.Parent = Item
-        
+
         local CheckIcon = Instance.new("TextLabel")
         CheckIcon.Size = UDim2.new(0, 30, 1, 0)
         CheckIcon.Position = UDim2.new(1, -32, 0, 0)
@@ -460,12 +462,12 @@ local function UpdatePlayerList()
         CheckIcon.TextSize = 14
         CheckIcon.Font = Enum.Font.SourceSans
         CheckIcon.Parent = Item
-        
+
         table.insert(PlayerListItems, Item)
         yPos = yPos + 28
         count = count + 1
     end
-    
+
     ListTitle.Text = "📋 ИГРОКИ (" .. count .. ") | ЦЕЛЕЙ: " .. targetCount
     PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
 end
@@ -474,34 +476,34 @@ local function SkidFling(TargetPlayer)
     local Character = Player.Character
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
     local RootPart = Humanoid and Humanoid.RootPart
-    
+
     if not Character or not Humanoid or not RootPart then
         return false
     end
-    
+
     if Humanoid.Health <= 0 then
         return false
     end
-    
+
     local TCharacter = TargetPlayer.Character
     if not TCharacter then return false end
-    
+
     local THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
     local TRootPart = THumanoid and THumanoid.RootPart
     local THead = TCharacter:FindFirstChild("Head")
     local Accessory = TCharacter:FindFirstChildOfClass("Accessory")
     local Handle = Accessory and Accessory:FindFirstChild("Handle")
-    
+
     if THumanoid and THumanoid.Sit then return false end
     if not TCharacter:FindFirstChildWhichIsA("BasePart") then return false end
-    
+
     local function FPos(BasePart, Pos, Ang)
         RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
         Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
         RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
         RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
     end
-    
+
     local function SFBasePart(BasePart)
         local TimeToWait = 2
         local Time = tick()
@@ -541,16 +543,16 @@ local function SkidFling(TargetPlayer)
             end
         until Time + TimeToWait < tick() or not FlingActive
     end
-    
+
     workspace.FallenPartsDestroyHeight = 0/0
-    
+
     local BV = Instance.new("BodyVelocity")
     BV.Parent = RootPart
     BV.Velocity = Vector3.new(0, 0, 0)
     BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    
+
     Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-    
+
     if TRootPart then
         SFBasePart(TRootPart)
     elseif THead then
@@ -562,11 +564,11 @@ local function SkidFling(TargetPlayer)
         Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
         return false
     end
-    
+
     BV:Destroy()
     Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
     workspace.CurrentCamera.CameraSubject = Humanoid
-    
+
     if getgenv().OldPos then
         repeat
             RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
@@ -581,17 +583,17 @@ local function SkidFling(TargetPlayer)
         until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25 or not FlingActive
         workspace.FallenPartsDestroyHeight = getgenv().FPDH
     end
-    
+
     return true
 end
 
 local function StartFling()
     if FlingActive then return end
-    
+
     UpdateTargetsList()
     local count = 0
     for _ in pairs(PlayersToFling) do count = count + 1 end
-    
+
     if count == 0 then
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "Ошибка",
@@ -600,22 +602,22 @@ local function StartFling()
         })
         return
     end
-    
+
     FlingActive = true
     StatusLabel.Text = "⚔️ Убиваю " .. count .. " игроков..."
     StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-    
+
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Старт",
         Text = "Флингуется " .. count .. " целей",
         Duration = 2
     })
-    
+
     spawn(function()
         while FlingActive do
             local Character = Player.Character
             local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-            
+
             if not Character or not Humanoid or Humanoid.Health <= 0 then
                 CharStatusLabel.Text = "💀 Ожидание перерождения..."
                 CharStatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
@@ -625,7 +627,7 @@ local function StartFling()
                 CharStatusLabel.Text = "✅ Персонаж жив"
                 CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
             end
-            
+
             UpdateTargetsList()
             local validTargets = {}
             for name, player in pairs(PlayersToFling) do
@@ -638,7 +640,7 @@ local function StartFling()
                     PlayersToFling[name] = nil
                 end
             end
-            
+
             for _, player in pairs(validTargets) do
                 if not FlingActive then break end
                 if Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") then
@@ -649,7 +651,7 @@ local function StartFling()
                 end
                 wait(0.1)
             end
-            
+
             local cnt = 0
             for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
             StatusLabel.Text = "⚔️ Убиваю " .. cnt .. " игроков..."
@@ -675,15 +677,15 @@ local function PerformRejoin(instant)
     if FlingActive then StopFling() end
     RejoinCount = RejoinCount + 1
     PlatformCreated = false
-    
+
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = instant and "⚡ РЕДЖОЙН" or "Режойн",
         Text = "Поиск нового сервера #" .. RejoinCount .. "...",
         Duration = 2
     })
-    
+
     local newServerId = GetRandomServer()
-    
+
     if newServerId then
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "✅ Сервер найден",
@@ -691,7 +693,9 @@ local function PerformRejoin(instant)
             Duration = 2
         })
         if not instant then wait(2) end
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, newServerId, Player)
+        -- Используем Teleport с параметром true для перехода на новый сервер
+        -- queue_on_teleport сработает при загрузке
+        TeleportService:Teleport(game.PlaceId, Player, nil, nil, nil, nil, nil, nil, nil, nil, true)
     else
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "⚠️ Не найден новый сервер",
@@ -708,9 +712,9 @@ local function StartRejoinTimer()
         RejoinTimer:Disconnect()
         RejoinTimer = nil
     end
-    
+
     local timeLeft = 600
-    
+
     RejoinTimer = RunService.Heartbeat:Connect(function(dt)
         if AutoRejoinActive then
             timeLeft = timeLeft - dt
@@ -789,12 +793,12 @@ Players.PlayerAdded:Connect(function(player)
     wait(0.5)
     UpdatePlayerList()
     UpdateTargetsList()
-    
+
     if FlingActive then
         local cnt = 0
         for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
         StatusLabel.Text = "⚔️ Убиваю " .. cnt .. " игроков..."
-        
+
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "👤 Новый игрок",
             Text = player.Name .. " добавлен в список целей!",
@@ -821,29 +825,29 @@ Player.CharacterAdded:Connect(function(character)
     CharStatusLabel.Text = "✅ Персонаж жив"
     CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
     wait(2)
-    
+
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Восстановление",
         Text = "Персонаж переродился! Продолжаем флинг.",
         Duration = 2
     })
-    
+
     UpdateTargetsList()
     local cnt = 0
     for _ in pairs(PlayersToFling) do cnt = cnt + 1 end
-    
+
     if not FlingActive and cnt > 0 then
         wait(1)
         StartFling()
     end
-    
+
     UpdatePlayerList()
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "✅ Восстановлено",
         Text = "Флинг продолжается!",
         Duration = 2
     })
-    
+
     humanoid.Died:Connect(function()
         CharStatusLabel.Text = "💀 Ожидание перерождения..."
         CharStatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
@@ -870,16 +874,16 @@ end
 
 spawn(function()
     wait(2)
-    
+
     ClearEverything()
-    
+
     wait(1)
     UpdatePlayerList()
     UpdateTargetsList()
-    
+
     local char = Player.Character
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    
+
     if char and humanoid and humanoid.Health > 0 then
         CharStatusLabel.Text = "✅ Персонаж жив"
         CharStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
