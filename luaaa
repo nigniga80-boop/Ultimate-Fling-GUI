@@ -24,7 +24,7 @@ Players.LocalPlayer.OnTeleport:Connect(function(State)
         TeleportCheck = true
         if queue_on_teleport then
             queue_on_teleport([[
-                loadstring(game:HttpGet('https://raw.githubusercontent.com/nigniga80-boop/lua/main/fling/luaaa'))()
+                loadstring(game:HttpGet('https://raw.githubusercontent.com/nigniga80-boop/Ultimate-Fling-GUI/refs/heads/main/luaaa'))()
             ]])
         end
     end
