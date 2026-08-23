@@ -21,6 +21,7 @@ local KeepInfYield = true
 
 local SCRIPT_URL = 'https://raw.githubusercontent.com/nigniga80-boop/Ultimate-Fling-GUI/refs/heads/main/luaaa'
 local LastServerId = game.JobId
+local FailedServers = {}
 
 Players.LocalPlayer.OnTeleport:Connect(function(State)
     if KeepInfYield and (not TeleportCheck) then
@@ -59,8 +60,15 @@ local function GetRandomServer()
 
     if data and data.data then
         for _, server in ipairs(data.data) do
-            -- Исключаем текущий сервер и сервер, на котором уже были
-            if server.id ~= currentServer and server.id ~= LastServerId then
+            local isFailed = false
+            for _, failed in ipairs(FailedServers) do
+                if server.id == failed then
+                    isFailed = true
+                    break
+                end
+            end
+            
+            if server.id ~= currentServer and not isFailed then
                 local playerCount = server.playing or 0
                 if playerCount < server.maxPlayers then
                     table.insert(servers, server.id)
@@ -70,10 +78,10 @@ local function GetRandomServer()
     end
 
     if #servers > 0 then
-        return servers[math.random(1, #servers)]
+        local selected = servers[math.random(1, #servers)]
+        return selected
     end
     
-    -- Если нет других серверов, пробуем найти любой сервер кроме текущего
     if data and data.data then
         for _, server in ipairs(data.data) do
             if server.id ~= currentServer then
@@ -86,7 +94,8 @@ local function GetRandomServer()
     end
 
     if #servers > 0 then
-        return servers[math.random(1, #servers)]
+        local selected = servers[math.random(1, #servers)]
+        return selected
     end
 
     return nil
@@ -707,13 +716,18 @@ local function PerformRejoin(instant)
 
     if newServerId then
         LastServerId = newServerId
+        if #FailedServers > 5 then
+            FailedServers = {}
+        end
+        table.insert(FailedServers, newServerId)
+        
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "✅ Сервер найден",
             Text = "Переход на новый сервер...",
             Duration = 2
         })
         if not instant then wait(2) end
-        TeleportService:Teleport(game.PlaceId, Player, nil, nil, nil, nil, nil, nil, nil, nil, true)
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, newServerId, Player)
     else
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "⚠️ Не найден новый сервер",
